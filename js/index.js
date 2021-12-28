@@ -136,3 +136,74 @@ function logout() {
     <button type="submit" class="btn btn-outline-light ms-3" data-bs-toggle="modal" data-bs-target="#frm-login">Login</button> 
     `;
 }
+
+function get_cart_list() {
+    var account_id = localStorage.getItem("account_id");
+
+    db.transaction(function(tx) {
+        var query = `
+        SELECT p.id, p.name, p.price, c.quantity
+        FROM cart c, product p
+        WHERE p.id = c.product_id AND c.account_id = ?
+        ORDER BY (p.name)
+        `;
+
+        tx.executeSql(query, [account_id], function(tx, result) {
+            log(`INFO`, `Get a list of products in cart successfully.`);
+            show_cart_list(result.rows);
+        }, transaction_error);
+    });
+}
+
+function show_cart_list(products) {
+    var total = 0;
+    var cart_list = document.getElementById("cart-list");
+
+    for (var product of products) {
+        var amount = product.price * product.quantity;
+        total += amount;
+
+        cart_list.innerHTML += `
+        <tr id="cart-list-item-${product.id}">
+         <td class="text-start" id="cart-list-name-${product.id}">${product.name}</td>
+         <td>${product.quantity}</td>
+         <td>${product.price}</td>
+         <td>${amount}</td>
+         <td>
+          <button onclick="delete_cart_item(this.id)" id="${product.id}" class="btn btn-danger btn-sm">Delete</button>
+         </td>
+        </tr>
+        `;
+    }
+
+    cart_list.innerHTML += `
+    <tr >
+     <th></th>
+     <th></th>
+     <th>Total</th>
+     <th>${total}</th>
+     <th></th>
+    </tr>
+    `;
+}
+
+function delete_cart_item(product_id) {
+    var account_id = localStorage.getItem("account_id");
+
+    db.transaction(function(tx) {
+        var query = "DELETE FROM cart WHERE account_id = ? AND product_id = ?";
+
+        tx.executeSql(query, [account_id, product_id],
+            function(tx, result) {
+                var product_name = document.getElementById(`cart-list-name-${product_id}`);
+                var message = `Delete "${product_name.innerText}" successfully.`;
+
+                document.getElementById(`cart-list-item-${product_id}`).outerHTML = "";
+
+                log(`INFO`, message);
+                alert(message);
+
+                update_cart_quantity();
+            }, transaction_error);
+    });
+}
